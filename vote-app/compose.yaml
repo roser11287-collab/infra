@@ -1,0 +1,58 @@
+name: vote-app
+
+x-app-env: &app-env
+  MYSQL_HOST: db
+  MYSQL_PORT: 3306
+  MYSQL_DATABASE: vote_db
+  MYSQL_USER: vote_user
+  MYSQL_PASSWORD: vote_pass
+
+x-common-service: &common-service
+  restart: always
+  networks:
+    - vote-net
+
+x-db-healthcheck: &db-healthcheck
+  test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-prootpass"]
+  interval: 5s
+  timeout: 3s
+  retries: 20
+  start_period: 20s
+
+services:
+  web:
+    <<: *common-service
+    build:
+      context: ./app
+    container_name: vote-web
+    ports:
+      - "5000:5000"
+    environment:
+      <<: *app-env
+      FLASK_ENV: production
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    <<: *common-service
+    image: mysql:8.0
+    container_name: vote-db
+    command: --default-authentication-plugin=mysql_native_password
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpass
+      MYSQL_DATABASE: vote_db
+      MYSQL_USER: vote_user
+      MYSQL_PASSWORD: vote_pass
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck: *db-healthcheck
+
+volumes:
+  mysql-data:
+
+networks:
+  vote-net:
+    driver: bridge
